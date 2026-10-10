@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { supabaseServer } from '@/lib/supabase/server';
+import { NavLink } from '@/components/nav-link';
 
 const NAV = [
   { href: '/', label: 'Overview' },
@@ -36,26 +37,30 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
-          <Link href="/" className="font-semibold text-neutral-900">Aangan Studio</Link>
-          <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-line bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2 pr-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">आ</span>
+            <span className="text-[15px] font-semibold tracking-tight text-ink">Aangan Studio</span>
+          </Link>
+          <nav className="flex flex-wrap items-center gap-1">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="text-neutral-600 hover:text-neutral-900">
-                {n.label}
-              </Link>
+              <NavLink key={n.href} href={n.href} label={n.label} />
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3 text-xs text-neutral-500">
-            <span className="hidden sm:inline">{profile?.email ?? user.email} · {role}</span>
+          <div className="ml-auto flex items-center gap-3 text-xs text-ink-soft">
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-500" />
+              {profile?.email ?? user.email} · <span className="font-medium capitalize text-ink">{role.replace('_', ' ')}</span>
+            </span>
             <form action="/auth/signout" method="post">
-              <button className="hover:text-neutral-900">Sign out</button>
+              <button className="rounded-full px-3 py-1.5 font-medium text-ink-soft transition hover:bg-brand-50 hover:text-brand-700">Sign out</button>
             </form>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-7">{children}</main>
     </div>
   );
 }

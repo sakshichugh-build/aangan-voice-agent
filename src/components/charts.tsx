@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from 'recharts';
 
-const PALETTE = ['#111827', '#047857', '#2563eb', '#ca8a04', '#dc2626', '#9333ea', '#6b7280', '#0891b2'];
+const PALETTE = ['#bd4a1e', '#0d9488', '#ca8a04', '#2563eb', '#7c3aed', '#059669', '#dc2626', '#78716c'];
 
 export function FunnelBars({ data }: { data: { stage: string; value: number }[] }) {
   return (
