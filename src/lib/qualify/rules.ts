@@ -20,8 +20,7 @@ export type Flag =
   | 'REPEAT_CALLER'
   | 'FRUSTRATED'
   | 'LARGE_PROJECT'
-  | 'PRICING_ASKED'
-  | 'SITE_VISIT';
+  | 'PRICING_ASKED';
 
 export interface RuleTraceEntry {
   criterion: string;
@@ -194,9 +193,6 @@ export function qualify(
     flags.add('VIP');
     add('vip', 'flag', 'Referral connected to the founder → VIP');
   }
-  if (/site[- ]?visit/i.test(`${ex.summary_for_designer ?? ''} ${ex.preferred_slots?.join(' ') ?? ''}`)) {
-    flags.add('SITE_VISIT');
-  }
 
   // ---- Decision assembly ------------------------------------------------
   const declineFails = declineReasons.filter((r) => r !== 'timeline');
@@ -230,7 +226,7 @@ function finalize(
   }
   // Canonical flag order for stable output
   const order: Flag[] = [
-    'VIP', 'LARGE_PROJECT', 'SITE_VISIT', 'PRICING_ASKED', 'TIGHT_TIMELINE',
+    'VIP', 'LARGE_PROJECT', 'PRICING_ASKED', 'TIGHT_TIMELINE',
     'DECISION_MAKER_UNCLEAR', 'BUDGET_UNCLEAR', 'REPEAT_CALLER', 'FRUSTRATED',
   ];
   const sorted = order.filter((f) => flags.has(f));

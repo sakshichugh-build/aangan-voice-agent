@@ -168,8 +168,12 @@ async function route(
       .select('id,action_token')
       .single();
 
+    // Site visit for large / new-possession / bare-shell homes (§5.6); else studio.
+    const siteVisit =
+      q.flags.includes('LARGE_PROJECT') ||
+      /possession|bare shell|new construction|empty|under construction/i.test(ex.current_state ?? '');
     const booking = ex.consultation_booked
-      ? { whenLabel: ex.preferred_slots?.[0] ?? 'confirmed on call', type: (q.flags.includes('SITE_VISIT') ? 'site_visit' : 'studio') as 'studio' | 'site_visit', designerName: sel.designer?.name }
+      ? { whenLabel: ex.preferred_slots?.[0] ?? 'confirmed on call', type: (siteVisit ? 'site_visit' : 'studio') as 'studio' | 'site_visit', designerName: sel.designer?.name }
       : null;
 
     const note = renderHandoff({

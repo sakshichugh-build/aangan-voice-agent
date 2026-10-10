@@ -16,16 +16,19 @@ export interface PricingLeak {
 
 const AGENT_LABELS = /^(front desk|agent|assistant|aangan|bot)\s*:/i;
 
-// Price-ish patterns the AGENT must never produce.
+// Price-ish patterns the AGENT must never produce. NOTE: a bare "N lakh" is NOT
+// flagged on its own — the agent legitimately echoes a caller's volunteered
+// budget to address misalignment (qualified.md §4). We flag only amounts in a
+// price-GIVING context: a currency symbol, a per-sq-ft figure, "starts at", or a
+// cost verb immediately before the amount.
 const PATTERNS: { re: RegExp; reason: string }[] = [
   { re: /₹\s?\d/, reason: 'rupee amount' },
   { re: /\brs\.?\s?\d/i, reason: 'rupee amount (Rs)' },
   { re: /\binr\s?\d/i, reason: 'rupee amount (INR)' },
-  { re: /\d[\d,]*\s*(?:lakh|lakhs|lac|lacs|crore|crores|k\b)/i, reason: 'amount in lakh/crore/k' },
   { re: /\d[\d,]*\s*(?:per|\/)\s*(?:sq\.?\s?ft|square\s?f(?:ee|oo)?t|sqft)/i, reason: 'per-sq-ft figure' },
   { re: /(?:per|\/)\s*(?:sq\.?\s?ft|sqft)\D{0,12}\d/i, reason: 'per-sq-ft figure' },
   { re: /\b(?:starts?\s+(?:at|from)|starting\s+(?:at|from))\b[^.]*\d/i, reason: '"starts at" + number' },
-  { re: /\b(?:costs?|charge[sd]?|price[sd]?|budget\s+of|around|approximately|roughly|typically|about)\b[^.]{0,24}(?:₹|rs\.?|inr)?\s*\d[\d,]*\s*(?:lakh|lac|crore|k|rupees)/i, reason: 'quoted cost' },
+  { re: /\b(?:costs?|charges?|charged|priced?|around|approximately|roughly|typically|about|it'?s|it will be|that'?s|comes to|estimate)\b[^.]{0,20}(?:₹|rs\.?|inr)?\s*\d[\d,.]*\s*(?:lakh|lac|crore|k|rupees)/i, reason: 'quoted cost' },
 ];
 
 function isAgentLine(line: string): boolean {

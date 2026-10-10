@@ -7,9 +7,10 @@
  *
  *   npm run eval            # needs ANTHROPIC_API_KEY in .env.local
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { extractLead } from '@/lib/extract/lead';
+import { ExtractionSchema } from '@/lib/qualify/schema';
 import { qualify, type Flag, type Outcome } from '@/lib/qualify/rules';
 import { scanTranscriptForPricingLeaks } from '@/lib/guardrails/pricing';
 import { llmCostRows, totalInr } from '@/lib/cost/ledger';
@@ -43,7 +44,11 @@ const EXPECTED: Record<string, Expected> = {
 };
 
 const EVAL_DIR = join(process.cwd(), 'seed', 'eval');
+const CACHE_DIR = join(EVAL_DIR, 'cache');
 const CONCURRENCY = 4;
+// --fresh re-extracts via the LLM (uses quota); default reuses cached extractions
+// so rules/guardrail changes can be re-verified for free.
+const FRESH = process.argv.includes('--fresh');
 
 interface Row {
   id: string;
@@ -61,7 +66,20 @@ interface Row {
 async function runOne(id: string, transcript: string): Promise<Row> {
   const exp = EXPECTED[id];
   const leaks = scanTranscriptForPricingLeaks(transcript);
-  const ex = await extractLead(transcript);
+  const cacheFile = join(CACHE_DIR, `${id}.json`);
+
+  let ex: Awaited<ReturnType<typeof extractLead>>;
+  if (!FRESH && existsSync(cacheFile)) {
+    const cached = JSON.parse(readFileSync(cacheFile, 'utf8'));
+    const parsed = ExtractionSchema.safeParse(cached.extraction);
+    ex = { extraction: parsed.success ? parsed.data : null, valid: parsed.success, attempts: 0, model: cached.model ?? 'cache', inputTokens: 0, outputTokens: 0, rawText: '' };
+  } else {
+    ex = await extractLead(transcript);
+    if (ex.valid && ex.extraction) {
+      mkdirSync(CACHE_DIR, { recursive: true });
+      writeFileSync(cacheFile, JSON.stringify({ model: ex.model, extraction: ex.extraction }, null, 2));
+    }
+  }
 
   if (!ex.valid || !ex.extraction) {
     return {
