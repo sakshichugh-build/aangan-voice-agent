@@ -28,7 +28,7 @@ const qj = (o: unknown) => `'${JSON.stringify(o).replace(/'/g, "''")}'::jsonb`;
 
 function base(o: Partial<Extraction>): Extraction {
   return {
-    intent: 'new_project', caller_name: null, phone: null, language: 'English',
+    intent: 'new_project', caller_name: null, caller_email: null, phone: null, language: 'English',
     project_type: 'residential_full', locality: null, city: 'Pune', in_service_area: 'yes',
     carpet_area_sqft: 1200, rooms_scope: ['kitchen', 'living', 'bedrooms'], current_state: 'lived-in', is_rented: false,
     wants_execution: 'yes', timeline_text: 'flexible', target_completion_date: null, weeks_available: null,

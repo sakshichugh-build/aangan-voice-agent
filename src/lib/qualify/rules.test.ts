@@ -6,6 +6,7 @@ function base(overrides: Partial<Extraction> = {}): Extraction {
   return {
     intent: 'new_project',
     caller_name: 'Test',
+    caller_email: null,
     phone: '+919812345678',
     language: 'English',
     project_type: 'residential_full',
