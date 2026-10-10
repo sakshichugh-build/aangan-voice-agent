@@ -3,6 +3,8 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isAuthorizedVoice } from '@/lib/voice/tool-auth';
 import { normalizePhone } from '@/lib/pipeline/ingest';
+import { emailProvider } from '@/lib/notify/email';
+import { renderConfirmation } from '@/lib/notify/confirmation';
 
 export const maxDuration = 20;
 const IST = 'Asia/Kolkata';
@@ -42,33 +44,52 @@ export async function POST(req: Request) {
     });
   }
 
-  // Upsert lead
+  const email = typeof body.email === 'string' && body.email.includes('@') ? body.email.trim() : null;
+
+  // Upsert lead (store name + email)
   let leadId: string | null = null;
   if (phone) {
     const existing = await db.from('leads').select('id').eq('channel', 'phone').eq('phone', phone).maybeSingle();
+    const patch: Record<string, unknown> = {};
+    if (body.name) patch.name = body.name;
+    if (email) patch.email = email;
     if (existing.data) {
       leadId = existing.data.id;
-      if (body.name) await db.from('leads').update({ name: body.name }).eq('id', leadId);
+      if (Object.keys(patch).length) await db.from('leads').update(patch).eq('id', leadId);
     } else {
-      const ins = await db.from('leads').insert({ channel: 'phone', phone, name: body.name ?? null }).select('id').single();
+      const ins = await db.from('leads').insert({ channel: 'phone', phone, ...patch }).select('id').single();
       leadId = ins.data?.id ?? null;
     }
   }
 
   const { data: designer } = await db.from('designers').select('name').eq('id', slot.designer_id).maybeSingle();
+  const whenLabel = formatInTimeZone(new Date(slot.starts_at), IST, 'EEEE d MMMM, h:mmaaa');
 
   await db.from('bookings').insert({
     slot_id: slot.id, lead_id: leadId, designer_id: slot.designer_id,
-    type: slot.type, starts_at: slot.starts_at, status: 'booked',
+    type: slot.type, starts_at: slot.starts_at, status: 'booked', customer_email: email,
   });
+
+  // Send the caller a branded confirmation email (skips cleanly if no email / no provider).
+  let emailed = false;
+  if (email) {
+    try {
+      const note = renderConfirmation({ name: (body.name as string) ?? null, whenLabel, type: slot.type, designer: designer?.name ?? null });
+      const res = await emailProvider().send({ to: email, subject: note.subject, text: note.text, html: note.html });
+      emailed = !res.skipped;
+    } catch (e) {
+      console.error('[book_consultation] confirmation email failed:', e);
+    }
+  }
 
   return NextResponse.json({
     ok: true,
     booking: {
       slot_id: slot.id,
-      label: formatInTimeZone(new Date(slot.starts_at), IST, 'EEEE d MMMM, h:mmaaa'),
+      label: whenLabel,
       type: slot.type,
       designer: designer?.name ?? null,
+      confirmation_emailed: emailed,
     },
   });
 }
