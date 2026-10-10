@@ -13,6 +13,7 @@ export const ExtractionSchema = z.object({
   intent: z.enum(['new_project', 'existing_client', 'other', 'dropped']),
 
   caller_name: z.string().nullable(),
+  caller_email: z.string().nullable(),
   phone: z.string().nullable(),
   language: z.string().nullable(),
 
@@ -79,6 +80,7 @@ export const EXTRACTION_JSON_SCHEMA = {
   properties: {
     intent: { type: 'string', enum: ['new_project', 'existing_client', 'other', 'dropped'] },
     caller_name: { type: ['string', 'null'] },
+    caller_email: { type: ['string', 'null'], description: "Caller's email if they gave one (for the booking-link confirmation)" },
     phone: { type: ['string', 'null'] },
     language: { type: ['string', 'null'], description: 'Primary language of the caller (e.g. English, Hindi, Marathi, Hinglish)' },
     project_type: {

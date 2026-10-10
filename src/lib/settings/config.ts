@@ -14,6 +14,7 @@ export interface AppSettings {
   afterHoursCallbackAt: string;
   maxOpenLeadsDefault: number;
   pipelineValueBand: { min_inr: number; max_inr: number };
+  calendlyUrl: string;
 }
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -64,5 +65,6 @@ export async function loadSettings(): Promise<AppSettings> {
     afterHoursCallbackAt: (s.get('after_hours_callback_at') as string) ?? '09:00',
     maxOpenLeadsDefault: Number(s.get('max_open_leads_default') ?? 5),
     pipelineValueBand: (s.get('pipeline_value_band') as AppSettings['pipelineValueBand']) ?? { min_inr: 800000, max_inr: 1400000 },
+    calendlyUrl: (s.get('calendly_url') as string) ?? process.env.CALENDLY_URL ?? '',
   };
 }

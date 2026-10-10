@@ -7,6 +7,7 @@ import { scanTranscriptForPricingLeaks } from '@/lib/guardrails/pricing';
 import { llmCostRows, vaaniCostRow } from '@/lib/cost/ledger';
 import { selectDesignerForLead } from '@/lib/assign/select';
 import { renderHandoff } from '@/lib/notify/handoff-note';
+import { renderBookingLink } from '@/lib/notify/confirmation';
 import { emailProvider } from '@/lib/notify/email';
 import { isAfterHours } from '@/lib/time/office-hours';
 import { env } from '@/lib/env';
@@ -187,6 +188,14 @@ async function route(
     if (recipients.length) {
       const sent = await safeEmail({ to: recipients, cc: cc.length ? cc : undefined, subject: note.subject, text: note.text, html: note.html });
       await db.from('handoffs').update({ sent_at: now.toISOString(), provider_message_id: sent?.id ?? null }).eq('id', handoff?.id);
+    }
+
+    // Email the caller the Calendly booking link (they pick a time; Calendly sends
+    // the confirmation + calendar invite). Needs their email + a configured link.
+    if (ex.caller_email && settings.calendlyUrl) {
+      if (call.lead_id) await db.from('leads').update({ email: ex.caller_email }).eq('id', call.lead_id);
+      const link = renderBookingLink(ex.caller_name, settings.calendlyUrl);
+      await safeEmail({ to: ex.caller_email, subject: link.subject, text: link.text, html: link.html });
     }
     return;
   }
