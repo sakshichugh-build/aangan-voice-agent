@@ -30,10 +30,15 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/auth');
+  // Public routes: auth pages and token-authenticated handoff action links
+  // (designers click these from email and are not logged in).
+  const isPublic =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/handoff');
 
-  // Protect the dashboard; everything under / except login/auth/api requires a user.
-  if (!user && !isAuthRoute) {
+  // Protect the dashboard; everything except public routes requires a user.
+  if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('next', pathname);
