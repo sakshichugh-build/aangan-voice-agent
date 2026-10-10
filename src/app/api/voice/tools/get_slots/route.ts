@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     .eq('status', 'available')
     .gt('starts_at', new Date().toISOString())
     .order('starts_at', { ascending: true })
-    .limit(limit * 4);
+    .limit(200); // fetch enough rows to find `limit` DISTINCT start times across designers
   if (type) qb = qb.eq('type', type);
   const { data: slots } = await qb;
 
