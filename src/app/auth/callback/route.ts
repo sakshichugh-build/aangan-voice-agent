@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 /** Exchanges the magic-link code for a session, ensures a profile row exists. */
 export async function GET(request: NextRequest) {
@@ -15,8 +16,9 @@ export async function GET(request: NextRequest) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        // Lazily provision a profile (default role front_desk; founder set in Settings).
-        await supabase
+        // Ensure a profile exists. profiles has no INSERT policy for the user, so
+        // use the service role (the DB trigger also covers new signups).
+        await supabaseAdmin()
           .from('profiles')
           .upsert(
             { id: user.id, email: user.email, role: 'front_desk' },
