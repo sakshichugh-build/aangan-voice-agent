@@ -11,8 +11,8 @@
     "test:watch": "vitest",
     "eval": "tsx --env-file=.env.local scripts/eval.ts",
     "parse:transcripts": "tsx scripts/parse-transcripts.ts",
-    "db:push": "supabase db push",
-    "db:seed": "tsx --env-file=.env.local scripts/db-seed.ts"
+    "db:migrate": "tsx --env-file=.env.local scripts/db-migrate.ts",
+    "db:seed": "tsx --env-file=.env.local scripts/db-migrate.ts -- --seed-only"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
@@ -21,6 +21,7 @@
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "next": "16.4.0",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "recharts": "^3.10.1",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.1.2",
