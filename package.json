@@ -13,7 +13,8 @@
     "parse:transcripts": "tsx scripts/parse-transcripts.ts",
     "db:migrate": "tsx --env-file=.env.local scripts/db-migrate.ts",
     "db:seed": "tsx --env-file=.env.local scripts/db-migrate.ts -- --seed-only",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "vaani:configure": "tsx scripts/vaani-configure.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

@@ -45,7 +45,8 @@ export async function ingestCall(input: IngestInput): Promise<IngestResult> {
   const provider = input.provider ?? 'vaani';
   const phone = normalizePhone(input.phone);
 
-  // Idempotency: existing call?
+  // Idempotency: existing call? If so, enrich it (multi-event sequences like
+  // call.started → call.ended → call_postprocessing) without duplicating.
   const { data: existing } = await db
     .from('calls')
     .select('id,lead_id')
@@ -53,6 +54,26 @@ export async function ingestCall(input: IngestInput): Promise<IngestResult> {
     .eq('provider_call_id', input.providerCallId)
     .maybeSingle();
   if (existing) {
+    const patch: Record<string, unknown> = {};
+    if (input.endedAt) patch.ended_at = input.endedAt;
+    if (input.durationSec != null) patch.duration_sec = input.durationSec;
+    if (input.recordingUrl) patch.recording_url = input.recordingUrl;
+    if (input.language) patch.language = input.language;
+    if (input.status) patch.status = input.status;
+    if (Object.keys(patch).length) await db.from('calls').update(patch).eq('id', existing.id);
+
+    // Attach transcript if newly provided and none stored yet.
+    if (input.transcript) {
+      const { data: t } = await db.from('transcripts').select('id').eq('call_id', existing.id).maybeSingle();
+      if (!t) await db.from('transcripts').insert({ call_id: existing.id, full_text: input.transcript, source: provider === 'simulate' ? 'seed' : 'vaani' });
+    }
+    // Enqueue if requested and not already queued.
+    if (input.enqueue) {
+      await db.from('jobs').upsert(
+        { type: 'post_call_pipeline', call_id: existing.id, provider_call_id: input.providerCallId, status: 'pending', run_after: new Date().toISOString() },
+        { onConflict: 'type,provider_call_id', ignoreDuplicates: true },
+      );
+    }
     return { callId: existing.id, leadId: existing.lead_id, created: false };
   }
 

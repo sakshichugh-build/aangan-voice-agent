@@ -5,16 +5,21 @@ import { env } from '@/lib/env';
 export const maxDuration = 30;
 
 /**
- * Inbound voice webhook. Phase 4 plugs in the Vaani VoiceProvider
- * (signature verification + payload normalisation). For now it accepts a
- * normalised event shape, verifies the shared secret, and stores the call (P1)
- * which enqueues the post-call pipeline. Idempotent on provider_call_id.
+ * Vaani call-event webhook (§6 P1). Vaani fires (per docs.vaanivoice.ai):
+ *   - call_started            : call begins
+ *   - call_ended              : session ends (duration, end_reason)
+ *   - call_postprocessing     : transcript + recording ready  ← triggers the pipeline
+ *
+ * Vaani's webhook has no documented signature header, so we authenticate with a
+ * shared secret in the URL query (`?s=…`) or the x-vaani-secret header.
+ * Idempotent on the Vaani call id across the multi-event sequence.
  */
 export async function POST(req: Request) {
-  const raw = await req.text();
-
-  // Shared-secret check (Vaani signature verification added in Phase 4).
-  const secret = req.headers.get('x-webhook-secret') ?? req.headers.get('x-cron-secret');
+  const url = new URL(req.url);
+  const secret =
+    url.searchParams.get('s') ??
+    req.headers.get('x-vaani-secret') ??
+    req.headers.get('x-webhook-secret');
   const expected = env.vaaniWebhookSecret() || env.cronSecret();
   if (!secret || secret !== expected) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -22,33 +27,62 @@ export async function POST(req: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = JSON.parse(raw);
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 });
   }
 
-  const type = String(body.type ?? body.event ?? '');
-  const providerCallId = String(body.providerCallId ?? body.call_id ?? body.callId ?? '');
-  if (!providerCallId) return NextResponse.json({ error: 'missing call id' }, { status: 400 });
+  const event = String(body.event ?? body.type ?? '');
+  const data = (body.data as Record<string, unknown>) ?? {};
+  const providerCallId = String(
+    body.call_id ?? data.call_id ?? body.room_name ?? body.callId ?? '',
+  );
+  if (!providerCallId) return NextResponse.json({ ok: true, ignored: 'no call id' });
 
-  // call.started → create an in_progress call (no job yet). call.ended → full ingest + enqueue.
-  const ended = type.includes('ended') || type.includes('completed') || body.status === 'completed';
-  const res = await ingestCall({
-    providerCallId,
-    provider: String(body.provider ?? 'vaani'),
-    direction: (body.direction as 'inbound' | 'outbound') ?? 'inbound',
-    phone: (body.from ?? body.from_number ?? body.phone) as string | null,
-    toNumber: (body.to ?? body.to_number) as string | null,
-    startedAt: (body.started_at ?? body.startedAt) as string | null,
-    endedAt: (body.ended_at ?? body.endedAt) as string | null,
-    durationSec: (body.duration_sec ?? body.durationSec) as number | null,
-    recordingUrl: (body.recording_url ?? body.recordingUrl) as string | null,
-    language: (body.language as string) ?? null,
-    status: (body.status as 'completed' | 'missed' | 'dropped' | 'failed') ?? (ended ? 'completed' : 'in_progress'),
-    transcript: (body.transcript as string) ?? null,
-    raw: body,
-    enqueue: ended,
-  });
+  const phone = (data.from_number ?? data.caller ?? body.from_number ?? body.from ?? null) as string | null;
+  const language = (data.language ?? body.language ?? null) as string | null;
 
-  return NextResponse.json({ ok: true, callId: res.callId, created: res.created });
+  if (event === 'call_postprocessing') {
+    // Transcript + recording ready → store and run the pipeline.
+    const durMs = Number(data.call_duration ?? 0);
+    await ingestCall({
+      providerCallId,
+      provider: 'vaani',
+      phone,
+      language,
+      durationSec: durMs ? Math.round(durMs / 1000) : null,
+      recordingUrl: (data.recording_url as string) ?? null,
+      transcript: (data.transcript as string) ?? null,
+      status: 'completed',
+      endedAt: new Date().toISOString(),
+      raw: body,
+      enqueue: true,
+    });
+    return NextResponse.json({ ok: true, processed: 'postprocessing' });
+  }
+
+  if (event === 'call_ended') {
+    // Short/empty call with no content → treat as dropped and queue a callback.
+    const durationSec = Number(body.call_duration ?? data.call_duration ?? 0);
+    if (durationSec > 0 && durationSec < 20) {
+      await ingestCall({
+        providerCallId, provider: 'vaani', phone, language,
+        durationSec: Math.round(durationSec), status: 'dropped',
+        endedAt: new Date().toISOString(), raw: body, enqueue: true,
+      });
+      return NextResponse.json({ ok: true, processed: 'dropped' });
+    }
+    // Otherwise wait for call_postprocessing (which carries the transcript).
+    return NextResponse.json({ ok: true, noted: 'call_ended' });
+  }
+
+  if (event === 'call_started') {
+    await ingestCall({
+      providerCallId, provider: 'vaani', phone, language,
+      startedAt: new Date().toISOString(), status: 'in_progress', raw: body, enqueue: false,
+    });
+    return NextResponse.json({ ok: true, noted: 'call_started' });
+  }
+
+  return NextResponse.json({ ok: true, ignored: event });
 }
