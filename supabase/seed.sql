@@ -33,8 +33,8 @@ where not exists (select 1 from designers);
 -- ----------------------------------------------------------------------------
 insert into rates (key, value, currency, note) values
   ('vaani_per_minute_inr',        6.0,  'INR', 'Vaani billed per minute — PLACEHOLDER, confirm'),
-  ('claude_in_per_mtok_usd',      3.0,  'USD', 'Claude Sonnet input $/1M tokens — confirm current'),
-  ('claude_out_per_mtok_usd',     15.0, 'USD', 'Claude Sonnet output $/1M tokens — confirm current'),
+  ('claude_in_per_mtok_usd',      2.0,  'USD', 'Claude Sonnet 5.5 input $/1M tokens'),
+  ('claude_out_per_mtok_usd',     10.0, 'USD', 'Claude Sonnet 5.5 output $/1M tokens'),
   ('usd_inr_fx',                  88.0, 'INR', 'USD→INR FX — update periodically'),
   ('sms_per_message_inr',         0.20, 'INR', 'SMS per message (if a provider is added)'),
   ('telegram_per_message_inr',    0.0,  'INR', 'Telegram is free'),
