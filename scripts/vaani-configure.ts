@@ -28,11 +28,8 @@ async function main() {
 
   const url = `${BASE}/api/agent/${AGENT_ID}/persona`;
   console.log(`PATCH ${url}`);
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'X-API-Key': KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const headers: Record<string, string> = { 'X-API-Key': KEY!, 'Content-Type': 'application/json' };
+  const res = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) });
   const text = await res.text();
   console.log(`HTTP ${res.status}`);
   console.log(text.slice(0, 1200));
