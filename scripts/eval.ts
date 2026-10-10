@@ -9,10 +9,10 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { extractLead } from '@/lib/extract/claude';
+import { extractLead } from '@/lib/extract/lead';
 import { qualify, type Flag, type Outcome } from '@/lib/qualify/rules';
 import { scanTranscriptForPricingLeaks } from '@/lib/guardrails/pricing';
-import { claudeCostRows, totalInr } from '@/lib/cost/ledger';
+import { llmCostRows, totalInr } from '@/lib/cost/ledger';
 
 interface Expected {
   outcome: Outcome;
@@ -112,14 +112,14 @@ async function main() {
   const totalLeaks = rows.reduce((s, r) => s + r.leaks, 0);
   const inTok = rows.reduce((s, r) => s + r.inTok, 0);
   const outTok = rows.reduce((s, r) => s + r.outTok, 0);
-  const costInr = totalInr(claudeCostRows(inTok, outTok, 'eval'));
+  const costInr = totalInr(llmCostRows(inTok, outTok, 'eval'));
 
   console.log('\n────────────────────────────────────────────────────────────');
   console.log(` Outcomes correct : ${correct}/${rows.length}   (target ≥ 18/20)`);
   console.log(` Pricing leaks    : ${totalLeaks}            (target 0)`);
   console.log(` Flag mismatches  : ${rows.filter((r) => !r.flagsOk).length}`);
   console.log(` Tokens           : ${inTok} in / ${outTok} out`);
-  console.log(` Est. Claude cost : ₹${costInr.toFixed(2)} for all 20 extractions`);
+  console.log(` Est. LLM cost    : ₹${costInr.toFixed(2)} for all 20 extractions`);
   console.log('────────────────────────────────────────────────────────────');
 
   const ok = correct >= 18 && totalLeaks === 0;

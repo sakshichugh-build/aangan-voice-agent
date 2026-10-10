@@ -1,5 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { env } from '@/lib/env';
+import { llmProvider } from '@/lib/llm';
 import { ExtractionSchema, EXTRACTION_JSON_SCHEMA, type Extraction } from '@/lib/qualify/schema';
 
 export const EXTRACTION_PROMPT_VERSION = 'extract-1.0.0';
@@ -18,7 +17,7 @@ export interface ExtractionResult {
 const SYSTEM = `You convert a single Aangan Studio phone-enquiry transcript into one strict JSON object describing the lead. Aangan Studio is a Pune interior-design firm (residential + small commercial up to ~3,000 sq ft; no restaurants/hotels/retail/gyms; serves Pune city + PCMC only).
 
 Rules:
-- Output ONLY a single minified JSON object. No prose, no markdown, no code fences.
+- Output ONLY a single JSON object. No prose, no markdown, no code fences.
 - Use exactly the field names and enum values given. Use null for unknown scalars, [] for unknown arrays.
 - in_service_area: "yes" for Pune city or PCMC localities (Kothrud, Baner, Aundh, Wakad, Koregaon Park, Kalyani Nagar, Viman Nagar, Hadapsar, Magarpatta, NIBM, Kondhwa, Undri, Warje, Erandwane, Deccan, Kharadi, Pimpri, Chinchwad, Pimple Saudagar/Nilakh, Ravet, Hinjewadi, and other Pune areas). "no" for Talegaon, Lonavala, Nashik, Mumbai, or other cities. "unclear" if no location was given.
 - project_type: residential_full (whole home / 2BHK+), residential_partial (a floor or 2+ rooms), single_room, commercial_office, commercial_other (clinic/studio), out_of_scope_category (restaurant/hotel/retail/gym/hospitality), or unclear.
@@ -37,10 +36,8 @@ ${JSON.stringify(EXTRACTION_JSON_SCHEMA)}`;
 
 function stripToJson(text: string): string {
   let t = text.trim();
-  // Strip markdown fences if the model added them despite instructions.
   const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) t = fence[1].trim();
-  // Grab the outermost JSON object.
   const first = t.indexOf('{');
   const last = t.lastIndexOf('}');
   if (first >= 0 && last > first) t = t.slice(first, last + 1);
@@ -48,37 +45,28 @@ function stripToJson(text: string): string {
 }
 
 /**
- * Extract a structured lead from a transcript via Claude. Validates with Zod and
- * retries once on invalid output. Returns token usage for the cost ledger.
+ * Extract a structured lead from a transcript via the configured LLM provider.
+ * Validates with Zod and retries once on invalid output. Returns token usage.
  */
 export async function extractLead(transcript: string): Promise<ExtractionResult> {
-  const client = new Anthropic({ apiKey: env.anthropicApiKey() });
-  const model = env.anthropicModel();
-
+  const llm = llmProvider();
   let inputTokens = 0;
   let outputTokens = 0;
   let rawText = '';
   let lastError = '';
+  let model = '';
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const userContent =
+    const user =
       attempt === 1
         ? `Transcript:\n\n${transcript}`
-        : `Transcript:\n\n${transcript}\n\nYour previous reply was not valid against the schema (${lastError}). Reply again with ONLY the corrected minified JSON object.`;
+        : `Transcript:\n\n${transcript}\n\nYour previous reply was not valid against the schema (${lastError}). Reply again with ONLY the corrected JSON object.`;
 
-    const res = await client.messages.create({
-      model,
-      max_tokens: 2000,
-      output_config: { effort: 'low' },
-      system: SYSTEM,
-      messages: [{ role: 'user', content: userContent }],
-    });
-
-    inputTokens += res.usage.input_tokens ?? 0;
-    outputTokens += res.usage.output_tokens ?? 0;
-
-    const textBlock = res.content.find((b) => b.type === 'text');
-    rawText = textBlock && 'text' in textBlock ? textBlock.text : '';
+    const res = await llm.generateJson({ system: SYSTEM, user, maxOutputTokens: 2048 });
+    inputTokens += res.inputTokens;
+    outputTokens += res.outputTokens;
+    rawText = res.text;
+    model = res.model;
 
     try {
       const parsed = JSON.parse(stripToJson(rawText));

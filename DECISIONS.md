@@ -2,6 +2,26 @@
 
 Non-obvious engineering choices and why. Newest first.
 
+## Phase 2 — Brain
+
+### LLM is Gemini, not Claude (founder's key constraint)
+The brief specifies Claude via the Anthropic API, but the founder could not supply
+an Anthropic key and provided a **Gemini** key instead (2026-10-10). Extraction
+(and the guardrail second-check) therefore run on **Google Gemini**. The LLM sits
+behind a provider interface (`src/lib/llm/`) so the rest of the app never imports a
+vendor directly — Claude can be swapped back by adding a provider and flipping
+`LLM_PROVIDER`. Model: **`gemini-3.8-flash`** (the only model this new-user key can
+call — 2.5/3.5/3.6/3.7 return 404 "not available to new users"; `*-latest` aliases
+404 too). Cost ledger sources renamed `claude_tokens_*` → `llm_tokens_*`
+(migration 0003); rates set to Gemini 2.5 Flash pricing ($0.30/$2.50 per MTok).
+
+### Free-tier rate limiting
+The Gemini key is free-tier: **5 requests/minute** and 503 spikes under load. The
+provider throttles to a configurable interval (`LLM_MIN_INTERVAL_MS`, default 15s =
+4/min) and retries 429 (wait a full minute) and 5xx (exponential backoff). This is
+fine for post-call processing (one call per enquiry, ~200/month) but means the eval
+of 20 transcripts runs sequentially over ~5 minutes.
+
 ## Phase 1 — Scaffold
 
 ### Reused the existing Supabase project; migrations via Management API

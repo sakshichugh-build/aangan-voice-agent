@@ -29,9 +29,10 @@ export const env = {
   cronSecret: () => required('CRON_SECRET'),
   voiceProvider: () => optional('VOICE_PROVIDER', 'vaani'),
 
-  // Anthropic
-  anthropicApiKey: () => required('ANTHROPIC_API_KEY'),
-  anthropicModel: () => optional('ANTHROPIC_MODEL', 'claude-sonnet-5-5'),
+  // LLM (extraction + guardrail second-check). Provider-swappable; default Gemini.
+  llmProvider: () => optional('LLM_PROVIDER', 'gemini'),
+  llmModel: () => optional('LLM_MODEL', 'gemini-3.8-flash'),
+  geminiApiKey: () => required('GEMINI_API_KEY'),
 
   // Email handoff (Resend by default)
   resendApiKey: () => required('RESEND_API_KEY'),

@@ -8,11 +8,10 @@ export type Rates = Record<string, number>;
 
 export const DEFAULT_RATES: Rates = {
   vaani_per_minute_inr: 6.0,
-  claude_in_per_mtok_usd: 2.0, // Sonnet 5.5 input $/1M
-  claude_out_per_mtok_usd: 10.0, // Sonnet 5.5 output $/1M
+  llm_in_per_mtok_usd: 0.3, // Gemini 2.5 Flash input $/1M
+  llm_out_per_mtok_usd: 2.5, // Gemini 2.5 Flash output $/1M
   usd_inr_fx: 88.0,
   sms_per_message_inr: 0.2,
-  telegram_per_message_inr: 0.0,
 };
 
 function rate(rates: Rates, key: string): number {
@@ -20,7 +19,7 @@ function rate(rates: Rates, key: string): number {
 }
 
 export interface CostRow {
-  source: 'vaani_minutes' | 'claude_tokens_in' | 'claude_tokens_out' | 'sms' | 'telegram' | 'fixed';
+  source: 'vaani_minutes' | 'llm_tokens_in' | 'llm_tokens_out' | 'sms' | 'telegram' | 'fixed';
   units: number;
   unit_label: string;
   unit_cost_inr: number;
@@ -28,19 +27,19 @@ export interface CostRow {
   meta?: Record<string, unknown>;
 }
 
-/** Claude token cost → two rows (input, output), in INR. */
-export function claudeCostRows(
+/** LLM token cost → two rows (input, output), in INR. Provider-agnostic. */
+export function llmCostRows(
   inputTokens: number,
   outputTokens: number,
   model: string,
   rates: Rates = DEFAULT_RATES,
 ): CostRow[] {
   const fx = rate(rates, 'usd_inr_fx');
-  const inPerTokInr = (rate(rates, 'claude_in_per_mtok_usd') * fx) / 1_000_000;
-  const outPerTokInr = (rate(rates, 'claude_out_per_mtok_usd') * fx) / 1_000_000;
+  const inPerTokInr = (rate(rates, 'llm_in_per_mtok_usd') * fx) / 1_000_000;
+  const outPerTokInr = (rate(rates, 'llm_out_per_mtok_usd') * fx) / 1_000_000;
   return [
     {
-      source: 'claude_tokens_in',
+      source: 'llm_tokens_in',
       units: inputTokens,
       unit_label: 'tokens',
       unit_cost_inr: inPerTokInr,
@@ -48,7 +47,7 @@ export function claudeCostRows(
       meta: { model },
     },
     {
-      source: 'claude_tokens_out',
+      source: 'llm_tokens_out',
       units: outputTokens,
       unit_label: 'tokens',
       unit_cost_inr: outPerTokInr,
