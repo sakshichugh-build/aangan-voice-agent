@@ -4,6 +4,25 @@ Non-obvious engineering choices and why. Newest first.
 
 ## Phase 1 — Scaffold
 
+### Reused the existing Supabase project; migrations via Management API
+The account is a **member of a managed org** (`mesaschool.co`) it doesn't own, so
+the Management API returns `Forbidden` on project creation and an empty org list.
+We therefore **restored and reused** the existing (paused) project
+`pagwanhxouvxibmjtnzz` (Tokyo / ap-northeast-1) rather than deleting it or
+creating a new one. Latency from Pune is fine (~100 ms) and the voice path runs
+through Vaani regardless. Migrations + seed are applied through the Management API
+**query endpoint** (`/v1/projects/{ref}/database/query`, runs as `postgres`), which
+avoids needing the project's DB password — see `scripts/db-migrate.ts`.
+
+### Deploy target
+GitHub: `sakshichugh-build/aangan-voice-agent`. Vercel project
+`aangan-voice-agent` (team `sakshi-c-mesa`), production
+`https://aangan-voice-agent-amber.vercel.app`. Production is public (webhooks,
+cron, designer action links need that); Vercel Authentication only gates preview
+URLs. `cron_config` in Supabase holds the base URL + cron secret so pg_cron can
+reach the app.
+
+
 ### Email for designer handoff (founder's decision)
 The brief argued for Telegram, but **Nikhil chose email** (2026-10-10). We keep
 the benefits Telegram would have given us:
